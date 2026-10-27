@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Portal Aplikasi Sekolah</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Google Font Inter -->
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-800 flex flex-col justify-between">
+
+  <!-- Header -->
+  <header class="bg-white border-b border-slate-200 sticky top-0 z-20 shadow-xs">
+    <div class="max-w-7xl mx-auto px-4 py-4 sm:px-6 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+      
+      <!-- Judul Portal & Logo Sekolah -->
+      <div>
+        <h1 class="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-3">
+          <img 
+            src="https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcRESVnGGzgEIkf9q6nFxX3TJ2oCPb2g8wWhobdhB6didA&s" 
+            alt="Logo Sekolah" 
+            class="h-8 sm:h-10 w-auto object-contain"
+          >
+          <span>Portal Aplikasi Spensaka</span>
+        </h1>
+        <p class="text-xs sm:text-sm text-slate-500 mt-0.5">Akses cepat seluruh layanan & aplikasi terintegrasi</p>
+      </div>
+
+      <!-- Kontrol: Pencarian & Tombol Fullscreen -->
+      <div class="flex items-center gap-3 w-full md:w-auto">
+        <!-- Input Pencarian -->
+        <div class="relative flex-1 md:w-64">
+          <input 
+            type="text" 
+            id="searchInput" 
+            onkeyup="filterApps()" 
+            placeholder="Cari aplikasi..." 
+            class="w-full pl-9 pr-4 py-2 border border-slate-300 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-all bg-slate-50 focus:bg-white"
+          >
+          <span class="absolute left-3 top-2.5 text-slate-400 text-sm">🔍</span>
+        </div>
+
+        <!-- Tombol Fullscreen -->
+        <button 
+          onclick="toggleFullScreen()" 
+          class="px-3.5 py-2 border border-slate-300 hover:bg-slate-100 rounded-xl text-xs font-semibold text-slate-700 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap bg-white shadow-xs"
+          title="Alihkan Layar Penuh"
+        >
+          <span id="fsIcon" class="text-base">⛶</span> 
+          <span id="fsText" class="hidden sm:inline">Layar Penuh</span>
+        </button>
+      </div>
+
+    </div>
+  </header>
+
+  <!-- Konten Utama -->
+  <main class="max-w-7xl mx-auto px-4 py-8 sm:px-6 flex-1 w-full">
+
+    <!-- Loading Indicator -->
+    <div id="loading" class="flex flex-col items-center justify-center py-24">
+      <div class="animate-spin rounded-full h-12 w-12 border-4 border-blue-600 border-t-transparent"></div>
+      <p class="text-slate-600 text-sm font-medium mt-4">Memuat data dari Google Spreadsheet...</p>
+    </div>
+
+    <!-- Tampilan Jika Data Tidak Ditemukan -->
+    <div id="noResults" class="hidden text-center py-16 bg-white rounded-2xl border border-slate-200 shadow-xs max-w-md mx-auto">
+      <p class="text-4xl mb-3">🔎</p>
+      <h3 class="text-base font-bold text-slate-800">Aplikasi tidak ditemukan</h3>
+      <p class="text-xs text-slate-500 mt-1">Coba gunakan kata kunci pencarian yang lain.</p>
+    </div>
+
+    <!-- Grid Kartu Aplikasi -->
+    <div id="appGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-5 hidden"></div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="bg-white border-t border-slate-200 py-4 px-4 text-center text-xs text-slate-500">
+    <p>Terhubung otomatis dengan Google Sheets &bull; Disituskan via Netlify</p>
+  </footer>
+
+  <!-- Script Logika -->
+  <script>
+    // URL Web App Google Apps Script Anda
+    const API_URL = "https://script.google.com/macros/s/AKfycbz5a_9zYbE5Q23M8HzvQrJsxibU26eLKw2vWvvr9vPK6mB2XVUThzKMXDR5y8pbUSHN/exec";
+    
+    let allApps = [];
+
+    // Fungsi mengambil data JSON dari Google Apps Script
+    async function fetchApps() {
+      try {
+        const response = await fetch(API_URL);
+        if (!response.ok) throw new Error('Respon jaringan tidak ok');
+        
+        allApps = await response.json();
+        
+        document.getElementById('loading').classList.add('hidden');
+        document.getElementById('appGrid').classList.remove('hidden');
+        
+        displayList(allApps);
+      } catch (error) {
+        console.error('Error fetching data:', error);
+        document.getElementById('loading').innerHTML = `
+          <div class="bg-red-50 border border-red-200 text-red-700 px-6 py-4 rounded-xl text-center max-w-md">
+            <p class="font-bold text-sm">Gagal memuat data aplikasi!</p>
+            <p class="text-xs mt-1 text-red-600">Pastikan skrip Apps Script telah di-deploy dengan akses 'Siapa saja' (Anyone).</p>
+          </div>
+        `;
+      }
+    }
+
+    // Fungsi merender daftar aplikasi ke dalam grid
+    function displayList(apps) {
+      const appGrid = document.getElementById('appGrid');
+      const noResults = document.getElementById('noResults');
+      
+      appGrid.innerHTML = '';
+
+      if (!apps || apps.length === 0) {
+        noResults.classList.remove('hidden');
+        return;
+      }
+      
+      noResults.classList.add('hidden');
+
+      apps.forEach(app => {
+        const card = document.createElement('a');
+        card.href = app.url;
+        card.target = '_blank';
+        card.rel = 'noopener noreferrer';
+        card.className = 'group block p-5 rounded-2xl border border-slate-200/80 shadow-xs hover:shadow-md hover:-translate-y-1 transition-all duration-200 flex flex-col justify-between';
+        
+        // Membaca warna background (app.warna atau fallback ke app.bgColor)
+        card.style.backgroundColor = app.warna || app.bgColor || '#ffffff';
+
+        // Membaca emoji/ikon dinamis dari Google Sheets (app.ikon atau app.emoji)
+        const displayIcon = app.ikon || app.emoji || '🌐';
+
+        card.innerHTML = `
+          <div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-3xl p-2.5 bg-white/80 backdrop-blur-sm rounded-xl shadow-2xs inline-block">
+                ${displayIcon}
+              </span>
+              <span class="text-slate-400 group-hover:text-blue-600 transition-colors text-base font-semibold">
+                ↗
+              </span>
+            </div>
+            <h2 class="text-base font-bold text-slate-900 group-hover:text-blue-600 transition-colors line-clamp-1">
+              ${app.nama}
+            </h2>
+            <p class="text-xs text-slate-600 mt-1.5 line-clamp-2 leading-relaxed">
+              ${app.subtitle || ''}
+            </p>
+          </div>
+          <div class="mt-5 pt-3 border-t border-black/5 flex items-center justify-between text-xs font-semibold text-slate-700 group-hover:text-blue-600">
+            <span>Buka Aplikasi</span>
+            <span>&rarr;</span>
+          </div>
+        `;
+        
+        appGrid.appendChild(card);
+      });
+    }
+
+    // Fungsi Pencarian / Filter
+    function filterApps() {
+      const query = document.getElementById('searchInput').value.toLowerCase().trim();
+      const filtered = allApps.filter(app => 
+        (app.nama && app.nama.toLowerCase().includes(query)) || 
+        (app.subtitle && app.subtitle.toLowerCase().includes(query))
+      );
+      displayList(filtered);
+    }
+
+    // Fungsi Toggle Fullscreen
+    function toggleFullScreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(err => {
+          alert(`Gagal mengaktifkan mode layar penuh: ${err.message}`);
+        });
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen();
+        }
+      }
+    }
+
+    // Event Listener untuk memperbarui tombol saat layar penuh berubah
+    document.addEventListener('fullscreenchange', () => {
+      const fsText = document.getElementById('fsText');
+      const fsIcon = document.getElementById('fsIcon');
+      
+      if (document.fullscreenElement) {
+        fsText.textContent = 'Keluar Layar Penuh';
+        fsIcon.textContent = '🗗';
+      } else {
+        fsText.textContent = 'Layar Penuh';
+        fsIcon.textContent = '⛶';
+      }
+    });
+
+    // Jalankan saat halaman dibuka
+    window.onload = fetchApps;
+  </script>
+</body>
+</html>
